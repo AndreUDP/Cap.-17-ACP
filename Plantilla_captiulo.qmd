@@ -1,0 +1,508 @@
+---
+title: "Capítulo 17: Análisis de componentes principales"
+subtitle: "PCA" 
+date: last-modified
+date-format: 'DD [de] MMMM, YYYY'
+author: 
+- name: "Maximiliano Muñoz <br> [nombre@mail.udp.cl](nombre@mail.udp.cl){style=\"color:blue;\"}"
+  affiliation: 
+    - "Facultad de Ciencias Sociales e Historia <br> Universidad Diego Portales"
+- name: "Jorge Morales <br> [nombre@mail.udp.cl](nombre@mail.udp.cl){style=\"color:blue;\"}"
+  affiliation: 
+    - "Facultad de Ciencias Sociales e Historia <br> Universidad Diego Portales"
+- name: "Tomás Romero <br> [nombre@mail.udp.cl](nombre@mail.udp.cl){style=\"color:blue;\"}"
+  affiliation: 
+    - "Facultad de Ciencias Sociales e Historia <br> Universidad Diego Portales"
+- name: "André Pontigo <br> [nombre@mail.udp.cl](nombre@mail.udp.cl){style=\"color:blue;\"}"
+  affiliation: 
+    - "Facultad de Ciencias Sociales e Historia <br> Universidad Diego Portales"
+- name: "Antonia Poduje <br> [nombre@mail.udp.cl](nombre@mail.udp.cl){style=\"color:blue;\"}"
+  affiliation: 
+    - "Facultad de Ciencias Sociales e Historia <br> Universidad Diego Portales"
+last-modified:
+title-block-banner: true
+format: 
+  html:
+    page-layout: full
+    embed-resources: true
+    smooth-scroll: true
+    fontcolor: black
+    toc: true
+    toc-location: left
+    toc-title: Indice
+    code-copy: true
+    code-link: true
+    code-fold: true
+    code-tools: true
+    code-summary: "Click para ver el código"
+    anchor-sections: true
+    code-overflow: wrap
+    fig-cap-location: top
+csl: apa.csl
+lang: es
+---
+
+```{r}
+#| code-fold: TRUE
+#| warning: false
+#| message: false
+#| results: 'hide'
+# Código de ajustes
+
+rm(list = ls()) # Limpiamos la memoria 
+options(scipen = 999) # Desactivamos la notación científica
+options(knitr.kable.NA = '') # NA en blanco
+
+# Librerías utilizadas
+library(rio)
+library(tidyverse)
+library(haven)
+library(h2o)
+
+```
+
+El análisis de componentes principales (PCA) es un método para encontrar representaciones más simplificadas dentro de un set de datos, que contenga la mayor variación en comparación al original. La idea es, por cada ´N´ observaciones se encuentra en p como espacio dimensional, pero no todas estas dimensiones son igualmente interesantes. En el PCA buscamos un menor número de dimensiones que podrían ser lo más interesante, entendiendo el término interesante medido por la cantidad de observaciones que varían a lo largo de cada dimensión. Cada nueva dimensión encontrada en el PCA es una combinación lineal de características de ´p´. El objetivo del análisis es usar un subset pequeño de estas características lineales en próximos análisis mientras se mantiene la mayoría de la información presente en los datos originales.
+
+### 17.1 Prerrequisitos
+
+Este apartado consiste en dar a conocer los paquetes que se tendrán que usar para el análisis en R, los cuales son:
+
+```{r}
+library(dplyr)       # Manipulación básica de datos y ploteo
+library(ggplot2)     # Visualización de datos
+library(h2o)         # Reducción de dimensiones
+h2o.init()           # Iniciar h2o
+```
+
+Para ilustrar técnicas de reducción de dimensiones usamos la base de datos **ELSOC2022**, mediante la siguiente pregunte: ¿Cómo se agrupan las personas al considerar diferentes cuestiones de acuerdo social?
+
+```{r}
+url <- "https://drive.google.com/file/d/1pTSoMgH4URxFryioEXZkBDT7WpLgSkfX/view?usp=sharing"
+
+temp_file <- tempfile(fileext = ".sav")
+
+download.file(url, temp_file, mode = "wb")
+
+ELSOC2022 <- read_sav(temp_file)
+
+```
+
+Para realizar las técnicas de reducción de dimensiones en R, el set de datos debe prepararse de la siguiente manera:
+
+1\. Set de datos en formato tidy
+
+2\. Cualquier valor perdido debe ser removido o imputed
+
+3\. El set de datos solo debe tener valores numéricos
+
+4\. Los datos numéricos deben estar estandarizados (centrados, escalas) para poder hacer los análisis comparativos
+
+### 17.2 La idea
+
+Los métodos de reducción de dimensiones, tal como el PCA, se enfocan en la reducción de dimensiones, permitiendo que la mayoría de la información o variabilidad de los datos sean explicados usando menos variables; para el caso de ACP.
+
+Usualmente se busca explicar atributos comunes en dimensiones más pequeñas dentro de los datos. Se pueden agrupar variables en una variable latente o agrupable. Esto puede ayudar a describir características dentro del set de datos y también podría remover multicolinealidad, el cual puede mejorar la precisión predictiva en modelos supervisados.
+
+#### Figura 17.1: Matriz de correlaciones
+
+![](images/clipboard-616135432.png)
+
+### 17.3 Seleccionando los componentes principales
+
+El componente principal de un set de variable X_1, X_2, . . , X_p es la combinación linear de variables.
+
++------------------------------------------------------------------------------------------------------------+
+| ```                                                                                                        |
+| \begin{equation} \tag{17.1} Z_{1} = \phi_{11}X_{1} + \phi_{21}X_{2} + ... + \phi_{p1}X_{p}, \end{equation} |
+| ```                                                                                                        |
++------------------------------------------------------------------------------------------------------------+
+
+Que tenga la varianza más grande. Aquí /phi_1 = /left(/phi\_{11}, /phi\_{21}, /dots, /phi{p1}/right) es el vector para el componente principal. /phi está normalizado para que /sum\_{j=1}\^{2}} = 1. Después del componente principal Z_1 ha sido determinado, podemos encoontrar el segundo componente principal Z_2. El segundo componente principal es la combinación linear de X_1, /dots , X_p que contenga una maxima varianza de todas las combinaciones lineral que estan sin correlacionar con Z_1:
+
++-----------------------------------------------------------------------------------------------------------+
+| ```                                                                                                       |
+| \begin{equation} \tag{17.2} Z_{2} = \phi_{12}X_{1} + \phi_{22}X_{2} + ... + \phi_{p2}X_{p} \end{equation} |
+| ```                                                                                                       |
++-----------------------------------------------------------------------------------------------------------+
+
+Donde de nuevo definimos \phi\_2 = \left(\\phi\_{12},\\phi\_{22}, \dots, \phi\_{p2}\\right) como el vector para el segundo componente principal. Este proceso sigue hasta que *p* componentes principales sea computados. ¿Como calculamos \phi\_1, \phi\_2, \dots, \phi\_p en práctica? Puede ser expuesto usando técnicas de algebra lineal, el *eigenvector* correspondiente al *eigenvalue* más grande de la matriz de covarianza es el set de cargas que explican las grandes proporciones de variabilidad.
+
+Podemos extender a 3 variables, asumiendo la relación entre estas 1, 2 y 3-. Los primeros dos componentes principales tienen rango que mejor se adapta a la variabilidad de los datos. Minimiza la suma de distancias cuadradas por cada punto del plano. Mientras mas dimensiones se agreguen, este ejemplo no será tan intuitivo.
+
+![](images/clipboard-482799127.png)
+
+##### Figura 17.2: Componentes principales de tres variables.
+
+### 17.4 Realizando PCA en R
+
+Hay varios paquetes integrados y externos para realizar el ACP en R. Recomendamos usar h2o ya que proporciona consistencia entre los métodos de reducción de dimensión que discutiremos más adelante y también automatiza muchos de los pasos de preparación de datos mencionados anteriormente (es decir, estandarizar características numéricas, imputar valores faltantes y codificar características categóricas).
+
+Vamos a iniciar h2o:
+
+```         
+h2o.no_progress()     #Se desactivan las barras de progreso  
+h2o.init(max_mem_size = "5g")    #Se otroga mayor memoria disponible por recomendación
+```
+
+Primero, convertimos nuestro marco de datos \``ELSOC_2019`´ a un objeto adecuado de h2o y luego usamos \`h2o.prcomp()\` para realizar el PCA. Algunos de los argumentos importantes que se pueden especificar en \`h2o.prcomp()\` incluyen:
+
+-   `pca_method`: Cadena de caracteres que especifica qué método de ACP utilizar. En realidad, hay varios enfoques diferentes para calcular los componentes principales (CPs). Cuando tus datos contienen principalmente datos numéricos, es mejor usar \``pca_method = "GramSVD"`\`. Cuando tus datos contienen muchas variables categóricas (o solo unas pocas variables categóricas con alta cardinalidad), recomendamos usar \``pca_method = "GLRM"`\`.
+
+-   `k`: Especifica cuántos CPs calcular. Es mejor crear el mismo número de CPs que de características y veremos en breve cómo identificar el número de CPs a usar, donde el número de CPs es menor que el número de características.
+
+-   `transform`: Cadena de caracteres que especifica cómo (si es que debe) estandarizarse tus datos.
+
+-   `impute_missing`: Lógico que especifica si se deben imputar o no los valores faltantes; si tus datos tienen valores faltantes, esto los imputará con la media correspondiente de la columna.
+
+-   `max_runtime_secs`: Número que especifica el tiempo máximo de ejecución (en segundos); al trabajar con conjuntos de datos grandes, esto limitará el tiempo de ejecución para el entrenamiento del modelo.
+
+Recordatorio: cuando tus datos contienen principalmente datos numéricos, es mejor usar \``pca_method = "GramSVD"`\`. Cuando tus datos contienen muchas variables categóricas (o solo unas pocas variables categóricas con alta cardinalidad), recomendamos usar \``pca_method = "GLRM`"\`
+
+```{r}
+ELSOC2022_h2o <- as.h2o(ELSOC2022)     #Se convierte la base de datos en un objeto de h2o
+
+ELSOC2022_pca <- h2o.prcomp(     #Se contruyen los componentes principales
+  training_frame = ELSOC2022_h2o,     #Objeto h2o de la base de datos
+  pca_method = "GramSVD",     #Metodo de agrupacion para datos numericos
+  k = ncol(ELSOC2022_h2o),     #Se especifica que se creen el mismo numero de PC por variables existentes
+  transform = "STANDARDIZE",    #se estandarizan los valores
+  impute_missing = TRUE,     #se imputan los valores perdidos
+  max_runtime_secs = 1000     #tiempo maximo de ejecucion en segundos 
+)
+```
+
+```{r}
+ELSOC2022_pca@model$importance    #Esta información incluye cada CP (Componente Principal), 
+                                   #la desviación estándar de cada CP, así como la proporción 
+                                   #y la proporción acumulada de varianza explicada con cada CP. 
+
+ELSOC2022_pca@model$eigenvectors %>% 
+  as.data.frame() %>% 
+  mutate(feature = row.names(.)) %>%
+  ggplot(aes(pc6, reorder(feature, pc1))) +
+  geom_point()     #Podemos identificar qué características originales contribuyen a los CP
+                   #evaluando las cargas. estas cargas representan la influencia de cada característica en el CP asociado.
+
+
+ELSOC2022_pca_data <- ELSOC2022_pca@model$eigenvectors %>%     #opcion alternativa del grafico anterior con nombres de variables.
+  as.data.frame() %>% 
+  mutate(feature = row.names(.),
+         feature_label = var_labels[feature])
+
+ggplot(ELSOC2022_pca_data, aes(x = pc6, y = reorder(feature_label, pc1))) +
+  geom_point() +
+  labs(x = "CP", y = "Variables", title = "Cargas de variable en Componente") +
+  theme_minimal()
+```
+
+![](images/clipboard-2663641256.png)
+
+###### Figura 17.3: Cargas de variable en Componentes.
+
+```{r}
+ELSOC2022_pca@model$eigenvectors %>% 
+  as.data.frame() %>% 
+  mutate(feature = row.names(.)) %>%
+  ggplot(aes(pc1, pc6, label = feature)) +
+  geom_text() 
+```
+
+Comparacion de los CP entre sí. Se muestra cómo los diferentes indicadores contribuyen al CP1 y al CP6. Podemos observar agrupamientos distintos de características y cómo contribuyen a ambos CPs.
+
+![](images/clipboard-409191374.png)
+
+###### Figura 17.4: Comparación de componentes
+
+### 17.5 Selección de número de componentes principales
+
+Hasta ahora hemos calculado los componentes principales y hemos comprendido un poco lo que nos dicen inicialmente los resultados. Sin embargo, uno de los objetivos principales del PCA es la reducción de dimensiones (en este caso, la reducción de características). En esencia, queremos salir de PCA con menos componentes que características originales, y con la advertencia de que estos componentes nos explican tanta variación como sea posible sobre nuestros datos. Pero, ¿cómo decidimos cuántas PC conservar? ¿Conservamos las 10, 20 o 40 primeras PC?
+
+Existen tres enfoques comunes para ayudar a tomar esta decisión:
+
+1.  Criterio de eigenvalue
+2.  Criterio de proporción de varianza explicada
+3.  Criterio del diagrama Scree
+
+#### 17.5.1 Criterio de eigenvalue
+
+La suma de los valores propios es igual al número de variables introducidas en el PCA; sin embargo, los valores propios oscilarán entre más de uno y casi cero. Un valor propio de 1 significa que el componente principal explicaría aproximadamente el valor de una variable de la variabilidad. La razón de utilizar el criterio del valor propio es que cada componente debe explicar al menos el valor de una variable de la variabilidad y, por lo tanto, el criterio del valor propio establece que sólo deben conservarse los componentes con valores propios superiores a 1.
+
+**`h2o.prcomp`()** calcula automáticamente las desviaciones estándar de las PC, que es igual a la raíz cuadrada de los valores propios. Por lo tanto, podemos calcular fácilmente los valores propios e identificar las PC en las que la suma de los valores propios es mayor o igual a 1. En consecuencia, si utilizamos este criterio, nos quedaremos con las 10 primeras PC de mi_cesta (véase la figura 17.5).
+
+```{r}
+eigen <- ELSOC2022_pca@model$importance["Standard deviation", ] ^ 2    
+#Se obtienen los eigenvalues. La suma de los valores propios (eigenvalues) es igual al número de variables 
+          #introducidas en el PCA; sin embargo, los valores propios variarán desde más de uno hasta cerca de cero. 
+          #Un valor propio de 1 significa que se explicaría aproximadamente la variabilidad equivalente a una variable.
+
+print(eigen)     #Suma de autovalores (eigenvalues)
+
+sum(eigen)     #La suma de todos los valores propios es igual al número de variables.
+
+which(eigen >= 1)     #¿Cual CP tiene un autovalor mayor a 1?
+
+eigenvals <- c(4.522467,1.671044,1.421541,1.221859,1.106707,1.028227,0.9651566,0.9048641,0.8072618,0.7655404,0.7248778,0.6907065,0.5699794,0.5561603,0.5433696,0.4651397,0.3904912,0.3786813,0.2659266);
+plot(
+  x = seq(1:length(eigenvals)), y = eigenvals,
+  type = "o",
+  xlab = "Componente principal", ylab = "Varianza de variables originales retenida");     #se grafican los autovalores de los componentes
+abline(h = 1, col = "red", lty = 2)  #se agrega una línea horizontal en y = 1. El criterio del valor propio conserva 
+                                        #todos los componentes principales donde la suma de los valores propios es mayor o igual a uno.
+
+```
+
+![](images/clipboard-1569126829.png)
+
+###### Figura 17.5: Componentes princiaples
+
+#### 17.5.2 Criterio de proporción de varianza explicada
+
+La proporción de varianza explicada (PVE) identifica el número óptimo de PC que se deben mantener en función de la variabilidad total que se desea tener en cuenta. Matemáticamente, la PVE para la m-ésima PC se calcula como:
+
+```{=tex}
+\begin{equation}
+
+\tag{17.3}
+
+PVE = \frac{\sum_{i=1}^{n}(\sum_{j=1}^{p}{\phi_{jm\end{equation}
+```
+**`h2o.prcomp`()**: nos proporciona la PVE y también la varianza acumulada explicada (CVE), por lo que sólo tenemos que extraer esta información y representarla gráficamente.
+
+*¿Qué cantidad de variabilidad es razonable?* 
+
+Esto varía según la aplicación y los datos que se utilicen. Sin embargo, cuando los CP se utilizan sólo con fines descriptivos, como la elaboración de perfiles de clientes, la proporción de variabilidad explicada puede ser inferior. Cuando los PC se van a utilizar como características derivadas para modelos posteriores, entonces la PVE debe ser la máxima que se pueda conseguir convenientemente, dadas las limitaciones.
+
+```{r}
+ELSOC2022_pca_var <- data.frame(
+  PC  = ELSOC2022_pca@model$importance %>% seq_along(),
+  PVE = ELSOC2022_pca@model$importance %>% .[2,] %>% unlist(),
+  CVE = ELSOC2022_pca@model$importance %>% .[3,] %>% unlist()
+) %>%
+  tidyr::gather(metric, variance_explained, -PC) %>%
+  ggplot(aes(PC, variance_explained)) +
+  geom_point() +
+  facet_wrap(~ metric, ncol = 1, scales = "free")
+         #Proporción de varianza explicada (PVE) identifica el número óptimo de CP que debemos mantener basado en la
+         #variabilidad total que deseamos explicar.
+         #`h2o.prcomp()` nos proporciona la PVE (proporción de varianza explicada) y también la CVE (varianza acumulada
+         #explicada), por lo que solo necesitamos extraer esta información y graficarla.
+
+print(ELSOC2022_pca_var)
+```
+
+![](images/clipboard-2651541032.png)
+
+###### Figura 17.6: Variabilidad
+
+#### **17.5.3 Criterio del gráfico Scree**
+
+Un gráfico de dispersión muestra los valores propios o PVE para cada PC individual. La mayoría de los scree plots tienen una forma muy similar, empezando muy alto a la izquierda, cayendo bastante rápido y aplanándose en algún punto. Esto se debe a que el primer componente suele explicar gran parte de la variabilidad, los siguientes componentes explican una cantidad moderada y los últimos componentes sólo explican una pequeña fracción de la variabilidad global. El criterio del diagrama de dispersión busca el «codo» de la curva y selecciona todos los componentes justo antes de que la línea se aplane, que en nuestro ejemplo son 6.
+
+El objetivo de este apartado es explicar cómo seleccionar el número óptimo de componentes principales (PCs) a mantener después de realizar un Análisis de Componentes Principales (PCA). La selección adecuada de componentes es crucial para lograr la reducción dimensional efectiva mientras se retiene la mayor cantidad de variabilidad en los datos originales.
+
+```{r}
+ELSOC2022_pca_scree <- data.frame(
+  PC  = ELSOC2022_pca@model$importance %>% seq_along,
+  PVE = ELSOC2022_pca@model$importance %>% .[2,] %>% unlist()
+) %>%
+  ggplot(aes(PC, PVE, group = 1, label = PC)) +
+  geom_point() +
+  geom_line() +
+  geom_text(nudge_y = -.002)
+         #Scree Plot: muestra los valores propios o PVE (proporción de varianza explicada) para cada PC individual.
+         #Su forma descendiente se debe a que el primer componente generalmente explica gran parte de la variabilidad,
+#los siguientes componentes explican una cantidad moderada, y los últimos componentes explican solo una pequeña
+#fracción de la variabilidad total.
+
+print(ELSOC2022_pca_scree)
+```
+
+![](images/clipboard-2117143742.png)
+
+###### Figura 17.7: Criterio SCREE
+
+### 17.6 Conclusiones
+
+1.  El PCA permite reducir la cantidad de variables en un conjunto de datos, manteniendo la mayor parte de la información original. En este estudio, se utilizó un conjunto de 19 variables distintas de las cuales se eligieron solo aquellas con valores propios mayores a 1, lo que garantiza que cada componente seleccionado es valioso.
+2.  Los componentes principales retenidos son aquellos que explican una cantidad alta de la variabilidad de los datos. Esto se determina utilizando el criterio de valor propio, donde solo se retienen los componentes con valores propios mayores a 1.
+3.  El uso de gráficos como el Scree Plot ayuda a visualizar cuántos componentes deben seleccionarse. En este capitulo se seleccionaron 6 componentes, ya que sus valores propios son mayores o iguales a 1.
+
+El PCA ofrece una reflexión final sobre la selección del número adecuado de componentes principales (PCs). Destacamos que no existe un método único y mejor para determinar cuántos PCs usar. Diferentes criterios pueden sugerir diferentes números de PCs a retener:
+
+1.  Criterio de la gráfica de codo (scree plot): Sugiere mantener 8 componentes.
+
+2.  Criterio del valor propio (eigenvalue): Indica que se deberían retener 10 componentes.
+
+3.  Criterio del porcentaje de varianza explicada: Basado en explicar al menos el 75% de la variabilidad total, sugiere retener 26 componentes.
+
+La elección del número de componentes depende del objetivo final y del flujo de trabajo analítico. Para un perfilado de clientes, podrían ser suficientes 8 o 10 componentes, mientras que para la reducción de dimensionalidad con fines predictivos se podrían retener 26 o más componentes. Este apartado también menciona que el PCA tradicional tiene ciertas desventajas, como su sensibilidad a los valores atípicos y la limitación en la captura de patrones no lineales en espacios de alta dimensión, sugiriendo alternativas como el PCA robusto o el PCA con kernel para abordar estas limitaciones.
+
+BORRAR
+
+Si el propósito es no mostrar el output del código para, se debe usar la opción `eval: FALSE`:
+
+```{r}
+#| eval: FALSE
+
+print("Este código no se ejecuta. Pero sí se muestra.")
+```
+
+Echo: false
+
+Si el propósito es no mostrar el output del código, se debe usar la opción `echo: FALSE`:
+
+```{r}
+#| echo: FALSE
+
+print("Este código no se muestra, pero sí se ejecuta.")
+
+vector_1 <- seq(from = 1, to = 5.5, by = .5)
+vector_2 <- seq(from = 1, to = 20, by = 2)
+vector_3 <- rep(2023, times = 10)
+vector_4 <- rep(c(1,0), each = 5)
+vector_5 <- vector_1 + vector_2
+
+matriz <- cbind(vector_1, vector_2, vector_3, vector_4, vector_5)
+matriz
+```
+
+### Warning y message
+
+Se pueden suprimir los mensajes de "warning" y "message" para obtener una salida más 'limpia'.
+
+-   **Warning:**
+
+```{r}
+vector_1 <- seq(from = 1, to = 5, by = 0.5)
+vector_2 <- seq(from = 1, to = 20, by = 2)
+
+vector_3 <- vector_1 + vector_2
+```
+
+Aplicar warning: false
+
+```{r}
+#| warning: false
+vector_1 <- seq(from = 1, to = 5, by = 0.5)
+vector_2 <- seq(from = 1, to = 20, by = 2)
+
+vector_3 <- vector_1 + vector_2
+```
+
+Aplicar message: false
+
+```{r}
+#| message: false
+library(tidyverse)
+```
+
+### Tablas
+
+### Tabla manual
+
+Puedes usar las herramientas del **menú de edición**.
+
+Las tablas se pueden realizar manualmente en R markdown de la siguiente forma:
+
+```         
+| Columna A | Columna B |
+|:---------:|:---------:|
+| Celda 1   | Celda 2   |
+```
+
+| Columna A | Columna B |
+|:---------:|:---------:|
+|  Celda 1  |  Celda 2  |
+
+### Tablas a partir de código
+
+Para poder armar tablas a partir de código, debes usar la librería `knitr`. La función que usaremos se llama `kable()`.
+
+También, es importante agregar una leyenda con las opciones:
+
+-   `#| label: tbl-pinguinos`. un nombre con el cuál identificar el chunk.
+
+-   `#| tbl-cap: "primeros 5 casos de la base de datos pinguinos"`. Una leyenda o *caption*.
+
+```{r}
+#| label: tbl-pinguinos
+#| tbl-cap: "primeros 5 casos de la base de datos pinguinos"
+
+library(datos)
+library(tidyverse) 
+pinguinos %>% 
+  head() %>% 
+  knitr::kable()
+```
+
+### Imágenes
+
+Para insertar una imágen, se puede usar el menú superior o usar sintaxis:
+
+-   **Archivo local:**
+
+```         
+![Imagen](files/imagen.png)
+```
+
+-   **Archivo en linea:**
+
+```         
+![Imagen](https://d33wubrfki0l68.cloudfront.net/0b4d0569b2ddf6147da90b110fbb2a17653c8b08/f06f3/images/shutterstock/r_vs_rstudio_1.png)
+```
+
+Puedes controlar el ancho y largo de la siguiente forma:
+
+```         
+![Imagen](files/imagen.png){width=300}
+```
+
+Imagen:
+
+![Imagen](https://d33wubrfki0l68.cloudfront.net/0b4d0569b2ddf6147da90b110fbb2a17653c8b08/f06f3/images/shutterstock/r_vs_rstudio_1.png){width="500"}
+
+-   **Método chunk**
+
+Puedes usar la función `include_graphics` para
+
+```{r}
+#| fig.align: 'center'
+
+knitr::include_graphics("files/imagen.png")
+```
+
+Se puede ocultar este bloque de código para que no se vea (echo: false).
+
+Se puede ajustar el ancho y alto de la imagen con las opciones:
+
+-   `fig.width`
+
+-   `fig.height`
+
+### Figuras de gráficos
+
+Para los gráficos, quarto tiene las herramientas para asignar título y leyenda:
+
+-   `label`: asigna un nombre tipo identificador al gráfico. Para indicar que es un gráfico, uso el prefijo `fig-`.
+
+-   `fig-cap`: permite poner un texto tipo leyenda.
+
+-   `fig.width`: ancho de la figura.
+
+-   `fig.height`: alto de la figura.
+
+(Ver código en el archivo .qmd)
+
+```{r}
+#| label: fig-plots
+#| fig-cap: "Un título muy elegnate"
+#| message: FALSE
+#| fig.width: 7
+#| fig.height: 4
+pinguinos %>% 
+  ggplot() + aes(x = isla) +
+  geom_bar() +
+  labs(
+    title = "Islas (pingüinos)"
+  )
+```
