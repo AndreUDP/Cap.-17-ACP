@@ -61,7 +61,7 @@ library(h2o)
 
 ```
 
-El análisis de componentes principales (PCA) es un método para encontrar representaciones más simplificadas dentro de un set de datos, que contenga la mayor variación en comparación al original. La idea es, por cada ´N´ observaciones se encuentra en p como espacio dimensional, pero no todas estas dimensiones son igualmente interesantes. En el PCA buscamos un menor número de dimensiones que podrían ser lo más interesante, entendiendo el término interesante medido por la cantidad de observaciones que varían a lo largo de cada dimensión. Cada nueva dimensión encontrada en el PCA es una combinación lineal de características de ´p´. El objetivo del análisis es usar un subset pequeño de estas características lineales en próximos análisis mientras se mantiene la mayoría de la información presente en los datos originales.
+El análisis de componentes principales (ACP) es un método para encontrar representaciones más simplificadas dentro de un set de datos, que contenga la mayor variación en comparación al original. La idea es, por cada ´N´ observaciones se encuentra en p como espacio dimensional, pero no todas estas dimensiones son igualmente interesantes. En el PCA buscamos un menor número de dimensiones que podrían ser lo más interesante, entendiendo el término interesante medido por la cantidad de observaciones que varían a lo largo de cada dimensión. Cada nueva dimensión encontrada en el PCA es una combinación lineal de características de ´p´. El objetivo del análisis es usar un subset pequeño de estas características lineales en próximos análisis mientras se mantiene la mayoría de la información presente en los datos originales.
 
 ### 17.1 Prerrequisitos
 
